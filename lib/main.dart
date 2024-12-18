@@ -79,6 +79,7 @@ class _DockState<T> extends State<Dock<T>> {
 
   void onDragStart(int index){
     setState(() {
+      _startExpanded = true;
       _isDragging = true;
       _isPlaced = false;
       _oldIndex = index;
@@ -90,6 +91,13 @@ class _DockState<T> extends State<Dock<T>> {
       _isDragging = false;
       _expandIndex = -1;
       _willAccept = false;
+      _startExpanded = false;
+    });
+  }
+
+  void onLeave(){
+    setState(() {
+      _startExpanded = false;
     });
   }
 
@@ -108,6 +116,8 @@ class _DockState<T> extends State<Dock<T>> {
   int _oldIndex = -1;
   int _newIndex = -1;
   bool _isPlaced = false;
+  bool _startExpanded = false;
+
   void onAccept(int oldIndex, int newIndex){
     setState(() {
       if(newIndex > items.length-1) newIndex = items.length - 1;
@@ -137,9 +147,10 @@ class _DockState<T> extends State<Dock<T>> {
               for(int i = 0; i< items.length; i++)...[
                 ExpandableAnimatedContainer(
                   canExpand: (_oldIndex < _newIndex) 
-                  ? _expandIndex +1  == i && _willAccept
+                  ? _expandIndex + 1  == i && _willAccept
                   : _expandIndex == i && _willAccept,
                   isPlaced: _isPlaced,
+                  startExpanded: _startExpanded && i == _oldIndex,
                 ),
                 if(i< items.length)
                 CustomDraggable(
@@ -147,10 +158,11 @@ class _DockState<T> extends State<Dock<T>> {
                   onDragStart: onDragStart, 
                   e: items[i],
                 ),
-                if(i == (items.length - 1))
+                if(i == (items.length - 1) && _oldIndex != items.length - 1)
                 ExpandableAnimatedContainer(
                   canExpand: _expandIndex == i,
                   isPlaced: _isPlaced,
+                  startExpanded: _startExpanded && i == _oldIndex,
                 ),
               ]
             ],
@@ -164,6 +176,7 @@ class _DockState<T> extends State<Dock<T>> {
                 index: i~/2, 
                 onWillAccept: onWillAccept,
                 onAccept: onAccept,
+                onLeave: onLeave,
               ),
             ],
           ),
@@ -177,11 +190,13 @@ class ExpandableAnimatedContainer extends StatefulWidget {
   const ExpandableAnimatedContainer({
     required this.canExpand,
     required this.isPlaced,
+    required this.startExpanded,
     super.key,
   });
 
   final bool canExpand;
   final bool isPlaced;
+  final bool startExpanded;
   @override
   State<ExpandableAnimatedContainer> createState() => _ExpandableAnimatedContainerState();
 }
@@ -190,8 +205,14 @@ class _ExpandableAnimatedContainerState extends State<ExpandableAnimatedContaine
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: Duration(milliseconds: widget.isPlaced ? 0 : 300),
-      width: widget.canExpand ? 64 : 0,
+      duration: Duration(
+        milliseconds: widget.startExpanded
+        ? 0
+        : widget.isPlaced ? 0 : 300
+      ),
+      width: widget.startExpanded
+      ? 64
+      : widget.canExpand ? 64 : 0,
       height: 64,
       // color: Colors.blue.withAlpha(100),                                              // Debug Visual
     );
@@ -267,7 +288,7 @@ class _CustomDraggableState extends State<CustomDraggable> {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: Duration(milliseconds: animation_speed),
+      duration: const Duration(milliseconds: 0),
       margin: _isDragStarted||_isAnimationStarted ? EdgeInsets.all(0) : EdgeInsets.all(8),
       width:  _isDragStarted||_isAnimationStarted ? 0 : 48,
       height: 48,
@@ -372,11 +393,13 @@ class HoverDragTarget extends StatefulWidget {
     required this.index,
     required this.onWillAccept,
     required this.onAccept,
+    required this.onLeave,
   });
 
   final int index;
   final Function(int) onWillAccept;
   final Function(int, int) onAccept;
+  final Function onLeave;
 
   @override
   State<HoverDragTarget> createState() => _HoverDragTargetState();
@@ -401,6 +424,7 @@ class _HoverDragTargetState extends State<HoverDragTarget> {
         setState(() {
           _canAccept = false;
         });
+        widget.onLeave();
       },
       onAcceptWithDetails: (details) {
         setState(() {
