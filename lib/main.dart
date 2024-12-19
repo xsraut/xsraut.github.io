@@ -76,6 +76,15 @@ class _DockState<T> extends State<Dock<T>> {
   late final List<T> _items = widget.items.toList();
 
   bool _isDragging = false;
+  bool _startExpanded = false;
+  bool _isPlaced = false;
+  bool _willAccept = false;
+
+  int _oldIndex = -1;
+  int _newIndex = -1;
+  int _expandIndex = -1;
+
+  int _currentHovered = -1;
 
   void onDragStart(int index){
     setState(() {
@@ -101,9 +110,6 @@ class _DockState<T> extends State<Dock<T>> {
     });
   }
 
-  int _expandIndex = -1;
-
-  bool _willAccept = false;
   void onWillAccept(int index){
     setState(() {
       _expandIndex = index;
@@ -113,20 +119,24 @@ class _DockState<T> extends State<Dock<T>> {
     });
   }
 
-  int _oldIndex = -1;
-  int _newIndex = -1;
-  bool _isPlaced = false;
-  bool _startExpanded = false;
 
   void onAccept(int oldIndex, int newIndex){
     setState(() {
       if(newIndex > items.length-1) newIndex = items.length - 1;
+      
       IconData item = items.removeAt(oldIndex);
       items.insert(newIndex, item);
+
       _isPlaced = true;
       _willAccept = false;
       _oldIndex = oldIndex;
       _newIndex = newIndex;
+    });
+  }
+
+  void onHovered(int hoveredIndex){
+    setState(() {
+      _currentHovered = hoveredIndex;
     });
   }
 
@@ -156,6 +166,8 @@ class _DockState<T> extends State<Dock<T>> {
                 CustomDraggable(
                   onDragEnd: onDragEnd, 
                   onDragStart: onDragStart, 
+                  onHover: onHovered,
+                  currentHovered: _currentHovered,
                   e: items[i],
                 ),
                 if(i == (items.length - 1) && _oldIndex != items.length - 1)
@@ -230,8 +242,8 @@ class CustomIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 48),
-      height: 48,
+      constraints: const BoxConstraints(minWidth: 48 * 1.2),
+      height: 48 * 1.2,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
         color: Colors.primaries[e.hashCode % Colors.primaries.length],
@@ -245,6 +257,8 @@ class CustomDraggable extends StatefulWidget {
   const CustomDraggable({
     required this.onDragEnd,
     required this.onDragStart,
+    required this.onHover,
+    required this.currentHovered,
     required this.e,
     super.key,
   });
@@ -252,6 +266,8 @@ class CustomDraggable extends StatefulWidget {
   final IconData e;
   final Function(int) onDragStart;
   final Function onDragEnd;
+  final Function(int) onHover;
+  final int currentHovered;
 
   @override
   State<CustomDraggable> createState() => _CustomDraggableState();
@@ -272,9 +288,10 @@ class _CustomDraggableState extends State<CustomDraggable> {
   double initial_width = 48 + 16;
   double current_width = 48 + 16;
 
+  bool _isHovered = false;
+
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     Future.delayed(Duration.zero, (){
       setState(() {
@@ -287,101 +304,133 @@ class _CustomDraggableState extends State<CustomDraggable> {
 
   @override
   Widget build(BuildContext context) {
+    if(widget.currentHovered != -1) animation_speed = 300;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 0),
-      margin: _isDragStarted||_isAnimationStarted ? EdgeInsets.all(0) : EdgeInsets.all(8),
-      width:  _isDragStarted||_isAnimationStarted ? 0 : 48,
+      // margin: _isDragStarted||_isAnimationStarted ? EdgeInsets.all(0) : EdgeInsets.all(8),
+      width:  _isDragStarted||_isAnimationStarted ? 0 : 64,
       height: 48,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: AlignmentDirectional.center,
-        children: [
-          AnimatedPositioned(
-            top:  y,
-            left: x,
-            duration: Duration(milliseconds: animation_speed),
-            curve: Curves.fastOutSlowIn,
-            child: Draggable<IconData>(
-              data: widget.e,
-              feedback: CustomIcon(e: widget.e),
-              childWhenDragging: const SizedBox.shrink(),
-              child: Container(
-                constraints: const BoxConstraints(minWidth: 48),
-                height: 48,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.primaries[widget.e.hashCode % Colors.primaries.length],
+      // color: Colors.red,
+      child: MouseRegion(
+        // onEnter: (event) {
+        //   widget.onHover(items.indexOf(widget.e));
+        //   setState(() {
+        //     _isHovered = true;
+        //   });
+        // },
+        onHover: (event) {
+          print('${event.delta.dx} ${event.delta.dy}');
+          if(event.delta.dx.abs() > 1 || event.delta.dx.abs() > 1 ){
+            widget.onHover(items.indexOf(widget.e));
+            setState(() {
+              _isHovered = true;
+            });
+          }
+        },
+        onExit: (event) {
+          widget.onHover(-1);
+          setState(() {
+            _isHovered = false;
+          });
+        },
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: AlignmentDirectional.center,
+          children: [
+            AnimatedPositioned(
+              top: _isHovered ? y - 12 
+                : widget.currentHovered != -1 ? y - (1/((widget.currentHovered - items.indexOf(widget.e)).abs()) * 5)
+                : y,
+              left: x,
+              duration: Duration(milliseconds: animation_speed),
+              curve: Curves.linear,
+              child: AnimatedScale(
+                duration: const Duration(milliseconds: 300),
+                scale: _isHovered ? 1.2 : 1,
+                child: Draggable<IconData>(
+                  data: widget.e,
+                  feedback: CustomIcon(e: widget.e),
+                  childWhenDragging: const SizedBox.shrink(),
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 48),
+                    height: 48,
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.primaries[widget.e.hashCode % Colors.primaries.length],
+                    ),
+                    child: Center(child: Icon(widget.e, color: Colors.white)),
+                  ),
+                
+                  onDragStarted: () async{
+                    setState(() {
+                      _isDragStarted = true;
+                      _isAnimationStarted = true;
+                    });
+                
+                    widget.onDragStart(items.indexOf(widget.e));
+                    setState(() {
+                      animation_speed = 300;
+                    });
+                    await Future.delayed(const Duration(milliseconds: 10));
+                    setState(() {
+                      current_width = 0;
+                    });
+                  },
+                
+                  onDragUpdate: (details) {
+                    setState(() {
+                      animation_speed = 1;
+                      x = x + details.delta.dx;
+                      y = y + details.delta.dy;
+                    });
+                  },
+                
+                  onDraggableCanceled: (velocity, offset) async{
+                    setState(() {
+                      animation_speed = 300;
+                      x = initial_x;
+                      y = initial_y;
+                    });
+                
+                    widget.onDragEnd();
+                
+                    setState(() {
+                      animation_speed = 300;
+                    });
+                    await Future.delayed(const Duration(milliseconds: 10));
+                    setState(() {
+                      current_width = initial_width;
+                    });
+                  },
+                
+                  onDragEnd: (_){
+                    setState(() {
+                      _isDragStarted = false;
+                      _isAnimationStarted = false;
+                    });
+                    widget.onDragEnd();
+                  },
+                
+                  onDragCompleted: (){
+                    setState(() {
+                      x = 0;
+                      y = 0;
+                      if(!_isDragStarted){
+                        animation_speed = 0;
+                      }else{
+                        animation_speed = 300;
+                      }
+                      _isDragStarted = false;
+                      _isAnimationStarted = false;
+                    });
+                    widget.onDragEnd();
+                  },
                 ),
-                child: Center(child: Icon(widget.e, color: Colors.white)),
               ),
-            
-              onDragStarted: () async{
-                setState(() {
-                  _isDragStarted = true;
-                  _isAnimationStarted = true;
-                });
-
-                widget.onDragStart(items.indexOf(widget.e));
-                setState(() {
-                  animation_speed = 300;
-                });
-                await Future.delayed(const Duration(milliseconds: 10));
-                setState(() {
-                  current_width = 0;
-                });
-              },
-            
-              onDragUpdate: (details) {
-                setState(() {
-                  animation_speed = 1;
-                  x = x + details.delta.dx;
-                  y = y + details.delta.dy;
-                });
-              },
-            
-              onDraggableCanceled: (velocity, offset) async{
-                setState(() {
-                  animation_speed = 300;
-                  x = initial_x;
-                  y = initial_y;
-                });
-            
-                widget.onDragEnd();
-            
-                setState(() {
-                  animation_speed = 300;
-                });
-                await Future.delayed(const Duration(milliseconds: 10));
-                setState(() {
-                  current_width = initial_width;
-                });
-              },
-            
-              onDragEnd: (_){
-                setState(() {
-                  _isDragStarted = false;
-                  _isAnimationStarted = false;
-                });
-                widget.onDragEnd();
-              },
-            
-              onDragCompleted: (){
-                setState(() {
-                  x = 0;
-                  y = 0;
-                  if(!_isDragStarted){
-                    animation_speed = 0;
-                  }else{
-                    animation_speed = 300;
-                  }
-                  _isDragStarted = false;
-                  _isAnimationStarted = false;
-                });
-                widget.onDragEnd();
-              },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
