@@ -3,6 +3,8 @@
 ## Overview
 Flutter Web Image Viewer is a simple web application built using Flutter that allows users to load and view images from a provided URL. The app also supports fullscreen viewing via JavaScript integration.
 
+## Web Demo : [xsraut.github.io](https://xsraut.github.io/)
+
 ## Features
 - Load images from a user-provided URL
 - View images in a responsive aspect ratio
@@ -47,6 +49,4 @@ Ensure you have Flutter installed and configured for web development.
 This project is licensed under the MIT License. See the `LICENSE` file for details.
 
 ## Author
-Developed by [Sourabh Raut](https://github.com/xsraut). Contributions are welcome!
-
->>>>>>> c7931b3f5af52d0b4cd38eedd18becb72f34dc86
+Developed by [Sourabh Raut](https://github.com/xsraut).
